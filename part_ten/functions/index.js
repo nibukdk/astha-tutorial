@@ -35,13 +35,13 @@ exports.addTimeStampToUser = functions.runWith({
 });
 
 // Create a function named addUserLocation 
-exports.addUserLocation = functions.runWith({ 
-    timeoutSeconds: 60,  
+exports.addUserLocation = functions.runWith({
+    timeoutSeconds: 60,
     memory: "256MB"
 }).https.onCall(async (data, context) => {
-   
+
     try {
-       // Fetch correct user document with user id.
+        // Fetch correct user document with user id.
         let snapshot = await db.collection('users').doc((context.auth.uid)).get();
         // Check if field value for location is null
         // functions.logger.log(snapshot['_fieldsProto']['userLocation']["valueType"] === "nullValue");
@@ -49,7 +49,7 @@ exports.addUserLocation = functions.runWith({
         if (locationValueType == 'nullValue') {
             await db.collection('users').doc((context.auth.uid)).set({ 'userLocation': data.userLocation }, { merge: true });
             functions.logger.log(`User location added    ${data.userLocation}`);
-                return data.userLocation;
+            return data.userLocation;
 
         }
         else {
@@ -68,7 +68,7 @@ exports.addUserLocation = functions.runWith({
 
 
 exports.getNearbyTemples = functions.https.onCall(async (data, _) => {
-    
+
     try {
         // Notify function's been called
         functions.logger.log("Add nearby temples function was called");
@@ -97,4 +97,55 @@ exports.getNearbyTemples = functions.https.onCall(async (data, _) => {
     }
     // If everything's fine return temples array.
     return temples;
+});
+
+
+// When the temple List Updates
+exports.updateNearbyTemples = functions.runWith({
+    timeoutSeconds: 120,
+    memory: "256MB"
+}).firestore.document('temples/{id}').onUpdate(async (change, context) => {
+    // If theres both new and old value
+    if (change.before.exists && change.after.exists) {
+        // temples list both new and old
+        let newTemplesList = change.after.data()['temples'];
+        let oldTemplesList = change.before.data()['temples'];
+
+        // Places Id list from both new and old list
+        let oldTemplesIdList = oldTemplesList.map(temple => temple['place_id']);
+        let newTemplesIdList = newTemplesList.map(temple => temple['place_id']);
+
+        // Lets find out if theres new temples id by filtering with old one
+        let filteredList = newTemplesIdList.filter(x => !oldTemplesIdList.includes(x));
+
+        // if the length are not same of fileted list has 
+        //length of 0 then nothing new is there so just return
+        if (oldTemplesIdList.length != newTemplesIdList.length || filteredList.length == 0) {
+            functions.logger.log("Nothing is changed so onUpdate returned");
+            return;
+        }
+        // If somethings changed then 
+        try {
+            functions.logger.log("On Update was called ");
+            // Make new list of temples
+            let temples = newTemplesList.map((temple) => {
+                return {
+                    'place_id': temple['place_id'],
+                    'address': temple['vicinity'] ? temple['vicinity'] : 'Not Available',
+                    'name': temple['name'] ? temple['name'] : 'Not Available',
+                    'latLng': {
+                        'lat': temple.hasOwnProperty('geometry') ? temple['geometry']['location']['lat'] : 'Not Available', 'lon': temple.hasOwnProperty('geometry') ? temple['geometry']['location']['lng'] : 'Not Available',
+                        'dateAdded': admin.firestore.Timestamp.now()
+                    }
+                }
+            }
+            );
+            // use the current context id to update temples, no need to merge
+            await db.collection('temples').doc(context.params.id).set({ 'palces_id_list': newTemplesIdList, temples: temples });
+        }
+        catch (e) { throw e; }
+        return { 'status': 200 };
+    }
+    // return nothing
+    return null;
 });
