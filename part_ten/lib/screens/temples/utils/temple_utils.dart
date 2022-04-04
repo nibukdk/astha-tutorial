@@ -1,5 +1,6 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:temple/screens/temples/models/temple.dart';
 
 class TemplesUtils {
   // Base url for google maps nearbysearch
@@ -23,5 +24,24 @@ class TemplesUtils {
         Uri.parse(_baseUrlNearBySearch + location + rankBy + type + api);
 
     return url;
+  }
+
+  List<TempleModel> mapper(List results) {
+    final newList = results
+        .map(
+          (temple) => TempleModel(
+            name: temple['name'],
+            address: temple['address'],
+            latLng: LatLng(
+              temple['latLng']['lat'],
+              temple['latLng']['lon'],
+            ),
+            imageUrl: temple['imageRef'],
+            placesId: temple['place_id'],
+          ),
+        )
+        .toList();
+
+    return newList;
   }
 }

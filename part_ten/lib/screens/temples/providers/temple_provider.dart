@@ -43,7 +43,7 @@ class TempleProvider with ChangeNotifier {
   ];
 
 // Future method to get temples
-  Future<void> getNearyByTemples(LatLng userLocation) async {
+  Future<List<TempleModel>?> getNearyByTemples(LatLng userLocation) async {
     // Get urls from the temple utils
     Uri url = templesUtils.searchUrl(userLocation);
 
@@ -80,20 +80,9 @@ class TempleProvider with ChangeNotifier {
         });
 
         // map the templesList restured by https callable
-        final newTempleLists = templesListCall.data['temples']
-            .map(
-              (temple) => TempleModel(
-                name: temple['name'],
-                address: temple['address'],
-                latLng: LatLng(
-                  temple['latLng']['lat'],
-                  temple['latLng']['lon'],
-                ),
-                imageUrl: temple['imageRef'],
-                placesId: temple['place_id'],
-              ),
-            )
-            .toList();
+        final newTempleLists =
+            templesUtils.mapper(templesListCall.data['temples']);
+
         // update the new temples list
         _temples = [...newTempleLists];
       } else {
@@ -107,22 +96,9 @@ class TempleProvider with ChangeNotifier {
           // fetch the values as list.
           final tempList = tempSnapShot.docs[0]['temples'] as List;
           // map the results into a list
-          final templesList = tempList
-              .map(
-                (temple) => TempleModel(
-                  name: temple['name'],
-                  address: temple['address'],
-                  latLng: LatLng(
-                    temple['latLng']['lat'],
-                    temple['latLng']['lon'],
-                  ),
-                  imageUrl: temple['imageRef'],
-                  placesId: temple['place_id'],
-                ),
-              )
-              .toList();
-          // update temples
-          _temples = [...templesList];
+          final temps = templesUtils.mapper(tempList);
+          // update temples we can use this
+          _temples = [...temps];
         } catch (e) {
           // incase of error temples list in empty
           _temples = [];
@@ -130,10 +106,10 @@ class TempleProvider with ChangeNotifier {
       }
     } catch (e) {
       // incase of error temples list in empty
-
       _temples = [];
     }
 // notify all the listeners
     notifyListeners();
+    return _temples;
   }
 }
